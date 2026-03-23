@@ -1,0 +1,25 @@
+{
+    "authors": {
+        "name": "Luke Doughty",
+        "url": ""
+    },
+    "build": {
+        "builder": ""
+    },
+    "description": "Library to communicate with the AD5933 Impedance meter chip",
+    "frameworks": "arduino",
+    "keywords": [
+        "capacitance",
+        "impedance",
+        "measure",
+        "meter",
+        "resistance"
+    ],
+    "name": "AXP-AD5933",
+    "platforms": "*",
+    "repository": {
+        "type": "",
+        "url": ""
+    },
+    "version": ""
+}

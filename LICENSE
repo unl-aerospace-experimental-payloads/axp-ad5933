@@ -1,0 +1,4 @@
+This library is derived from the 2015 AD5933 mbed library by Marijn Billiet,
+originally published under the Apache License 2.0.
+Original source: https://registry.platformio.org/libraries/mbed-dipi/AD5933
+Modifications by Luke Doughty, 2026 — Arduino port.
