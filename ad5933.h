@@ -32,6 +32,17 @@ public:
     AD5933(TwoWire& wire, bool useExternalClock);
 
     /**
+     * @brief Get the current output frequency based on the configured sweep parameters and current step.
+     * 
+     * Calculates what the frequency should be at the current step of the sweep using the formula:
+     *   frequency = startFrequency + (currentStep * stepFrequency)
+     * Note: This does not read a frequency value from the device, but rather computes it based on the sweep configuration. 
+     *   Could potentially become inaccurate if the device state gets out of sync with the driver's tracking of currentStep.
+     * @return Current frequency in Hz, or 0 if the sweep parameters have not been initialized.
+     */
+    uint8_t getFrequency();
+
+    /**
      * @brief Trigger a single impedance measurement at the current or next frequency.
      *
      * Waits for the settling time configured in setSettlingTime(), then reads
@@ -120,6 +131,10 @@ private:
     TwoWire& _wire;
     uint8_t PGAandVoltout;  ///< Cached value of control register bits [2:0] for PGA and voltage range.
     bool _useExternalClock;
+    uint32_t _startFrequency;
+    uint32_t _stepFrequency;
+    uint16_t _numberOfSteps;
+    uint16_t _currentStep;
 
     /**
      * @brief Set the number of output cycles to produce before sampling begins.

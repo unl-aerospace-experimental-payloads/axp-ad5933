@@ -25,6 +25,10 @@ AD5933::AD5933(TwoWire& wire, bool useExternalClock) : _wire(wire), _useExternal
     PGAandVoltout = 0x00;
     _wire.begin();
     _wire.setClock(400000);
+    _startFrequency = 0;
+    _stepFrequency = 0;
+    _numberOfSteps = 0;
+    _currentStep = 0;
 }
 
 bool AD5933::gotoAddressPointer(uint8_t address)
@@ -107,6 +111,14 @@ bool AD5933::setFrequencySweepParam(unsigned int startFrequency, unsigned int st
 bool AD5933::initFrequencySweepParam(unsigned int startFrequency, unsigned int stepFrequency, unsigned int numberOfSteps, unsigned int settlingCycles, bool enablePGAGainX1, int voltageRange)
 {
     bool ok = setFrequencySweepParam(startFrequency, stepFrequency, numberOfSteps);
+
+    if (ok) {
+        _startFrequency = startFrequency;
+        _stepFrequency = stepFrequency;
+        _numberOfSteps = numberOfSteps;
+        _currentStep = 0;
+    }
+
     ok &= setSettlingTime(settlingCycles);
     ok &= standby();
     ok &= setAnalogCircuit(enablePGAGainX1, voltageRange);
@@ -173,13 +185,26 @@ bool AD5933::powerdown()
     return setControlReg(COMMAND_POWER_DOWN);
 }
 
+uint8_t AD5933::getFrequency()
+{
+    return _startFrequency + (_currentStep * _stepFrequency);
+}
+
 bool AD5933::Measure(bool increment)
 {
     if (increment) {
         setControlReg(COMMAND_INCREMENT_FREQUENCY);
+        _currentStep++; // THis could potentially before the device actually increments the frequency, but we will assume it works for now. If we wanted to be more robust, we could check the frequency sweep complete bit and reset currentStep back to 0 if we see it set.
     } else {
         setControlReg(0x00);
         setControlReg(COMMAND_REPEAT_FREQUENCY);
+    }
+    if (getStatusBit(FREQUENCY_SWEEP_COMPLETE_BIT)) {
+        if (_currentStep != _numberOfSteps) {
+            Serial.println("Warning: AD5933 frequency sweep complete bit is set, but currentStep does not equal numberOfSteps. This may indicate that the driver and device are out of sync on the current step count.");
+        }
+        // Sweep complete. Reset currentStep back to 0 so that getFrequency() returns to startFrequency until the next sweep starts.
+        _currentStep = 0;
     }
     delayMicroseconds(ADC_SETTLING_WAIT_MICROSECONDS);
     bool ok = getData(); 
