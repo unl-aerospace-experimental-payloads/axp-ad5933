@@ -190,7 +190,7 @@ uint8_t AD5933::getFrequency()
     return _startFrequency + (_currentStep * _stepFrequency);
 }
 
-bool AD5933::Measure(bool increment)
+bool AD5933::measure(bool increment)
 {
     if (increment) {
         setControlReg(COMMAND_INCREMENT_FREQUENCY);
@@ -207,6 +207,32 @@ bool AD5933::Measure(bool increment)
         _currentStep = 0;
     }
     delayMicroseconds(ADC_SETTLING_WAIT_MICROSECONDS);
+    bool ok = getData(); 
+    return ok;
+}
+
+bool AD5933::kickoffMeasurement(bool increment)
+{
+    if (increment) {
+        setControlReg(COMMAND_INCREMENT_FREQUENCY);
+        _currentStep++; // THis could potentially before the device actually increments the frequency, but we will assume it works for now. If we wanted to be more robust, we could check the frequency sweep complete bit and reset currentStep back to 0 if we see it set.
+    } else {
+        setControlReg(0x00);
+        setControlReg(COMMAND_REPEAT_FREQUENCY);
+    }
+    if (getStatusBit(FREQUENCY_SWEEP_COMPLETE_BIT)) {
+        if (_currentStep != _numberOfSteps) {
+            Serial.println("Warning: AD5933 frequency sweep complete bit is set, but currentStep does not equal numberOfSteps. This may indicate that the driver and device are out of sync on the current step count.");
+        }
+        // Sweep complete. Reset currentStep back to 0 so that getFrequency() returns to startFrequency until the next sweep starts.
+        _currentStep = 0;
+    }
+    return true;
+}
+
+bool AD5933::getMeasurementResults()
+{
+    // assumes ADC_SETTLING_WAIT has passed.
     bool ok = getData(); 
     return ok;
 }

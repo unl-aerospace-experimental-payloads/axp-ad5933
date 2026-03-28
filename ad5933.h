@@ -57,8 +57,11 @@ public:
      * @return true on success, false if the ADC did not signal valid data within
      *         the timeout or if any I2C transaction failed.
      */
-    bool Measure(bool incrementFrequency);
+    bool measure(bool incrementFrequency);
 
+    bool kickoffMeasurement(bool incrementFrequency);
+
+    bool getMeasurementResults();
     /**
      * @brief Reset the device, clearing sweep state while preserving register contents.
      *
