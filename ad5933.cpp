@@ -11,9 +11,8 @@
 #define AD5933_I2C_ADDRESS                       0x0D
 #define AD5933_INTERNAL_CLOCK_FREQUENCY_HZ       16776000UL  // 16.776 MHz internal oscillator
 #define ADC_SETTLING_WAIT_MICROSECONDS           1800        // microseconds to wait after issuing a frequency command before polling for valid ADC data
-#define POLLING_TIMEOUT_COUNT                    50
+#define POLLING_TIMEOUT_COUNT                    500000         // microseconds
 #define POLLING_WAIT_MICROSECONDS                1000         // microseconds to wait between polling attempts for valid ADC data or temperature data
-
 #define STATUS_REGISTER                          0x8F
 #define TEMPERATURE_VALID_BIT                    0x01
 #define REAL_IMAGINARY_VALID_BIT                 0x02
