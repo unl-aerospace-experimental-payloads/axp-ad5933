@@ -211,7 +211,7 @@ bool AD5933::measure(bool increment)
     return ok;
 }
 
-bool AD5933::kickoffMeasurement(bool increment)
+void AD5933::kickoffMeasurement(bool increment)
 {
     if (increment) {
         setControlReg(COMMAND_INCREMENT_FREQUENCY);
@@ -227,7 +227,6 @@ bool AD5933::kickoffMeasurement(bool increment)
         // Sweep complete. Reset currentStep back to 0 so that getFrequency() returns to startFrequency until the next sweep starts.
         _currentStep = 0;
     }
-    return true;
 }
 
 bool AD5933::getMeasurementResults()

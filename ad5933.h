@@ -59,7 +59,7 @@ public:
      */
     bool measure(bool incrementFrequency);
 
-    bool kickoffMeasurement(bool incrementFrequency);
+    void kickoffMeasurement(bool incrementFrequency);
 
     bool getMeasurementResults();
     /**
