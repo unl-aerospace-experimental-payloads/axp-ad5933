@@ -108,7 +108,7 @@ bool AD5933::setFrequencySweepParam(unsigned int startFrequency, unsigned int st
     return ok;
 }
 
-bool AD5933::initFrequencySweepParam(unsigned int startFrequency, unsigned int stepFrequency, unsigned int numberOfSteps, unsigned int settlingCycles, bool enablePGAGainX1, int voltageRange)
+bool AD5933::initFrequencySweepParam(uint32_t startFrequency, uint32_t stepFrequency, uint16_t numberOfSteps, unsigned int settlingCycles, bool enablePGAGainX1, int voltageRange)
 {
     bool ok = setFrequencySweepParam(startFrequency, stepFrequency, numberOfSteps);
 
@@ -185,7 +185,7 @@ bool AD5933::powerdown()
     return setControlReg(COMMAND_POWER_DOWN);
 }
 
-uint8_t AD5933::getFrequency()
+uint32_t AD5933::getFrequency()
 {
     return _startFrequency + (_currentStep * _stepFrequency);
 }

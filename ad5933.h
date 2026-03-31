@@ -40,7 +40,7 @@ public:
      *   Could potentially become inaccurate if the device state gets out of sync with the driver's tracking of currentStep.
      * @return Current frequency in Hz, or 0 if the sweep parameters have not been initialized.
      */
-    uint8_t getFrequency();
+    uint32_t getFrequency();
 
     /**
      * @brief Trigger a single impedance measurement at the current or next frequency.
@@ -117,8 +117,8 @@ public:
      * @param voltageRange     Output voltage range 1–4 (see setAnalogCircuit()).
      * @return true on success, false if any I2C transaction or ADC read failed.
      */
-    bool initFrequencySweepParam(unsigned int startFrequency, unsigned int stepFrequency,
-                                 unsigned int numberOfSteps,  unsigned int numberOfCycles,
+    bool initFrequencySweepParam(uint32_t startFrequency, uint32_t stepFrequency,
+                                 uint16_t numberOfSteps,  unsigned int numberOfCycles,
                                  bool enablePGAGainX1, int voltageRange);
 
     /// Raw real component of the last impedance measurement (uncalibrated ADC code).
