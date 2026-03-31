@@ -3,6 +3,11 @@
 
 #include <Arduino.h>
 #include <Wire.h>
+#include "ad5933_config.h"
+#ifdef MUX_ENABLED
+#include "TCA9548.h"
+#endif
+
 
 /**
  * @brief Driver for the AD5933 impedance converter and network analyzer.
@@ -20,6 +25,19 @@
 class AD5933
 {
 public:
+    #ifdef MUX_ENABLED
+    /**
+     * @brief Construct an AD5933 driver instance.
+     *
+     * @param wire    Reference to the TwoWire (I2C) bus to use (e.g. Wire, Wire1, Wire2).
+     *                On Teensy 4.1: Wire  = pins 18/19, Wire1 = pins 17/16, Wire2 = pins 25/24.
+     * @param mux     Reference to the TCA9548 I2C multiplexer instance.
+     * @param useExternalClock  Clock source select.
+     *                true  = use an external clock signal on the MCLK pin.
+     *                false = use the AD5933's internal 16.776 MHz oscillator (typical default).
+     */
+    AD5933(TwoWire& wire, TCA9548& mux, uint8_t channel, bool useExternalClock);
+    #else
     /**
      * @brief Construct an AD5933 driver instance.
      *
@@ -30,7 +48,7 @@ public:
      *                false = use the AD5933's internal 16.776 MHz oscillator (typical default).
      */
     AD5933(TwoWire& wire, bool useExternalClock);
-
+    #endif
     /**
      * @brief Get the current output frequency based on the configured sweep parameters and current step.
      * 
@@ -124,6 +142,10 @@ public:
                                  uint16_t numberOfSteps,  unsigned int numberOfCycles,
                                  bool enablePGAGainX1, int voltageRange);
 
+    #ifdef MUX_ENABLED
+    void takeI2CBus();
+    #endif
+
     /// Raw real component of the last impedance measurement (uncalibrated ADC code).
     int real;
 
@@ -138,6 +160,10 @@ private:
     uint32_t _stepFrequency;
     uint16_t _numberOfSteps;
     uint16_t _currentStep;
+    #ifdef MUX_ENABLED
+    TCA9548& _mux; // I2C multiplexer instance
+    uint8_t _muxChannel; // Multiplexer channel this device is on
+    #endif
 
     /**
      * @brief Set the number of output cycles to produce before sampling begins.
