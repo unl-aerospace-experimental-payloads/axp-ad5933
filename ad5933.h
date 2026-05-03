@@ -3,6 +3,11 @@
 
 #include <Arduino.h>
 #include <Wire.h>
+#include "ad5933_config.h"
+#ifdef MUX_ENABLED
+#include "TCA9548.h"
+#endif
+
 
 /**
  * @brief Driver for the AD5933 impedance converter and network analyzer.
@@ -20,6 +25,19 @@
 class AD5933
 {
 public:
+    #ifdef MUX_ENABLED
+    /**
+     * @brief Construct an AD5933 driver instance.
+     *
+     * @param wire    Reference to the TwoWire (I2C) bus to use (e.g. Wire, Wire1, Wire2).
+     *                On Teensy 4.1: Wire  = pins 18/19, Wire1 = pins 17/16, Wire2 = pins 25/24.
+     * @param mux     Reference to the TCA9548 I2C multiplexer instance.
+     * @param useExternalClock  Clock source select.
+     *                true  = use an external clock signal on the MCLK pin.
+     *                false = use the AD5933's internal 16.776 MHz oscillator (typical default).
+     */
+    AD5933(TwoWire& wire, TCA9548& mux, uint8_t channel, bool useExternalClock);
+    #else
     /**
      * @brief Construct an AD5933 driver instance.
      *
@@ -30,6 +48,17 @@ public:
      *                false = use the AD5933's internal 16.776 MHz oscillator (typical default).
      */
     AD5933(TwoWire& wire, bool useExternalClock);
+    #endif
+    /**
+     * @brief Get the current output frequency based on the configured sweep parameters and current step.
+     * 
+     * Calculates what the frequency should be at the current step of the sweep using the formula:
+     *   frequency = startFrequency + (currentStep * stepFrequency)
+     * Note: This does not read a frequency value from the device, but rather computes it based on the sweep configuration. 
+     *   Could potentially become inaccurate if the device state gets out of sync with the driver's tracking of currentStep.
+     * @return Current frequency in Hz, or 0 if the sweep parameters have not been initialized.
+     */
+    uint32_t getFrequency();
 
     /**
      * @brief Trigger a single impedance measurement at the current or next frequency.
@@ -46,8 +75,11 @@ public:
      * @return true on success, false if the ADC did not signal valid data within
      *         the timeout or if any I2C transaction failed.
      */
-    bool Measure(bool incrementFrequency);
+    bool measure(bool incrementFrequency);
 
+    void kickoffMeasurement(bool incrementFrequency);
+
+    bool getMeasurementResults();
     /**
      * @brief Reset the device, clearing sweep state while preserving register contents.
      *
@@ -106,9 +138,13 @@ public:
      * @param voltageRange     Output voltage range 1–4 (see setAnalogCircuit()).
      * @return true on success, false if any I2C transaction or ADC read failed.
      */
-    bool initFrequencySweepParam(unsigned int startFrequency, unsigned int stepFrequency,
-                                 unsigned int numberOfSteps,  unsigned int numberOfCycles,
+    bool initFrequencySweepParam(uint32_t startFrequency, uint32_t stepFrequency,
+                                 uint16_t numberOfSteps,  unsigned int numberOfCycles,
                                  bool enablePGAGainX1, int voltageRange);
+
+    #ifdef MUX_ENABLED
+    void takeI2CBus();
+    #endif
 
     /// Raw real component of the last impedance measurement (uncalibrated ADC code).
     int real;
@@ -120,6 +156,14 @@ private:
     TwoWire& _wire;
     uint8_t PGAandVoltout;  ///< Cached value of control register bits [2:0] for PGA and voltage range.
     bool _useExternalClock;
+    uint32_t _startFrequency;
+    uint32_t _stepFrequency;
+    uint16_t _numberOfSteps;
+    uint16_t _currentStep;
+    #ifdef MUX_ENABLED
+    TCA9548& _mux; // I2C multiplexer instance
+    uint8_t _muxChannel; // Multiplexer channel this device is on
+    #endif
 
     /**
      * @brief Set the number of output cycles to produce before sampling begins.
