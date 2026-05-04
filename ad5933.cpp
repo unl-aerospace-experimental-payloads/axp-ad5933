@@ -10,9 +10,17 @@
 
 #define AD5933_I2C_ADDRESS                       0x0D
 #define AD5933_INTERNAL_CLOCK_FREQUENCY_HZ       16776000UL  // 16.776 MHz internal oscillator
+/*
+FROM THE AD5933 DATASHEET:
+    The ADC takes 1024 samples,
+    and the result is stored as real data and imaginary data in
+    Register Address 0x94 to Register Address 0x97. The conversion
+    process takes approximately 1 ms using a 16.777 MHz clock.
+*/
+#define INIT_SETTLING_WAIT_MICROSECONDS         1000        // microseconds to wait after initializing frequency sweep before polling for valid ADC data
 #define ADC_SETTLING_WAIT_MICROSECONDS           1800        // microseconds to wait after issuing a frequency command before polling for valid ADC data
-#define POLLING_TIMEOUT_COUNT                    50
 #define POLLING_WAIT_MICROSECONDS                1000         // microseconds to wait between polling attempts for valid ADC data or temperature data
+#define POLLING_TIMEOUT_COUNT                    10
 #define STATUS_REGISTER                          0x8F
 #define TEMPERATURE_VALID_BIT                    0x01
 #define REAL_IMAGINARY_VALID_BIT                 0x02
@@ -24,8 +32,6 @@
 AD5933::AD5933(TwoWire& wire, TCA9548& mux, uint8_t channel, bool useExternalClock) : _wire(wire), _mux(mux), _muxChannel(channel), _useExternalClock(useExternalClock)
 {
     PGAandVoltout = 0x00;
-    _wire.begin();
-    _wire.setClock(400000);
     _startFrequency = 0;
     _stepFrequency = 0;
     _numberOfSteps = 0;
@@ -39,8 +45,6 @@ void AD5933::takeI2CBus(){
 AD5933::AD5933(TwoWire& wire, bool useExternalClock) : _wire(wire), _useExternalClock(useExternalClock)
 {
     PGAandVoltout = 0x00;
-    _wire.begin();
-    _wire.setClock(400000);
     _startFrequency = 0;
     _stepFrequency = 0;
     _numberOfSteps = 0;
@@ -141,7 +145,7 @@ bool AD5933::initFrequencySweepParam(uint32_t startFrequency, uint32_t stepFrequ
     ok &= standby();
     ok &= setAnalogCircuit(enablePGAGainX1, voltageRange);
     ok &= setControlReg(COMMAND_INITIALIZE_WITH_START_FREQUENCY);
-    delay(5);
+    delayMicroseconds(INIT_SETTLING_WAIT_MICROSECONDS);
     ok &= setControlReg(COMMAND_START_FREQUENCY_SWEEP);
     delayMicroseconds(ADC_SETTLING_WAIT_MICROSECONDS);
     ok &= getData();
@@ -205,7 +209,7 @@ bool AD5933::powerdown()
 
 uint32_t AD5933::getFrequency()
 {
-    return _startFrequency + (_currentStep * _stepFrequency);
+    return _startFrequency + (_stepFrequency * _currentStep);
 }
 
 bool AD5933::measure(bool increment)
@@ -235,12 +239,12 @@ void AD5933::kickoffMeasurement(bool increment)
         if (_currentStep != _numberOfSteps) {
             Serial.println("Warning: AD5933 frequency sweep complete bit is set, but currentStep does not equal numberOfSteps. This may indicate that the driver and device are out of sync on the current step count.");
         } else {
-            Serial.println("frequency sweep complete bit is set, starting new sweep.");
+            // Serial.println("frequency sweep complete bit is set, starting new sweep.");
         }
         // Sweep complete. Reset currentStep back to 0 so that getFrequency() returns to startFrequency until the next sweep starts.
         standby();
         setControlReg(COMMAND_INITIALIZE_WITH_START_FREQUENCY);
-        delay(5);
+        delayMicroseconds(INIT_SETTLING_WAIT_MICROSECONDS);
         setControlReg(COMMAND_START_FREQUENCY_SWEEP);
         _currentStep = 0;
     } else {
@@ -261,20 +265,13 @@ bool AD5933::getMeasurementResults()
     return ok;
 }
 
-bool AD5933::getData()
+bool AD5933::isDataReady()
 {
-    int i = 0;
-    while (!getStatusBit(REAL_IMAGINARY_VALID_BIT) && i < POLLING_TIMEOUT_COUNT) {
-        delayMicroseconds(POLLING_WAIT_MICROSECONDS);
-        i++;
-    }
-    Serial.printf("Polling complete after %u microseconds\n", i * POLLING_WAIT_MICROSECONDS);
+    return getStatusBit(REAL_IMAGINARY_VALID_BIT);
+}
 
-    if (i == POLLING_TIMEOUT_COUNT) {
-        Serial.println("AD5933: ADC data not valid after polling. Timed out.");
-        return false;
-    }
-
+bool AD5933::readData()
+{
     uint8_t r_hi = getRegister(0x94);
     uint8_t r_lo = getRegister(0x95);
     uint8_t i_hi = getRegister(0x96);
@@ -284,6 +281,22 @@ bool AD5933::getData()
     imaginary = (int16_t)((uint16_t)i_hi << 8 | i_lo);
 
     return true;
+}
+
+bool AD5933::getData()
+{
+    int i = 0;
+    while (!isDataReady() && i < POLLING_TIMEOUT_COUNT) {
+        delayMicroseconds(POLLING_WAIT_MICROSECONDS);
+        i++;
+    }
+
+    if (i == POLLING_TIMEOUT_COUNT) {
+        Serial.println("AD5933: ADC data not valid after polling. Timed out.");
+        return false;
+    }
+
+    return readData();
 }
 
 float AD5933::getTemperature()
