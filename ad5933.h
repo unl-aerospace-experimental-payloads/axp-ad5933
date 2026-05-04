@@ -80,6 +80,12 @@ public:
     void kickoffMeasurement(bool incrementFrequency);
 
     bool getMeasurementResults();
+
+    /// Returns true if real/imaginary data is valid in the chip registers (non-blocking).
+    bool isDataReady();
+
+    /// Reads real/imaginary registers into `real` and `imaginary`. Call only after isDataReady() returns true.
+    bool readData();
     /**
      * @brief Reset the device, clearing sweep state while preserving register contents.
      *
@@ -153,17 +159,18 @@ public:
     int imaginary;
 
 private:
-    TwoWire& _wire;
     uint8_t PGAandVoltout;  ///< Cached value of control register bits [2:0] for PGA and voltage range.
+    TwoWire& _wire;
+    #ifdef MUX_ENABLED
+    TCA9548& _mux; // I2C multiplexer instance
+    uint8_t _muxChannel; // Multiplexer channel this device is on
+    #endif
     bool _useExternalClock;
     uint32_t _startFrequency;
     uint32_t _stepFrequency;
     uint16_t _numberOfSteps;
     uint16_t _currentStep;
-    #ifdef MUX_ENABLED
-    TCA9548& _mux; // I2C multiplexer instance
-    uint8_t _muxChannel; // Multiplexer channel this device is on
-    #endif
+
 
     /**
      * @brief Set the number of output cycles to produce before sampling begins.
