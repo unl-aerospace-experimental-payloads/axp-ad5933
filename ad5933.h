@@ -77,15 +77,21 @@ public:
      */
     bool measure(bool incrementFrequency);
 
-    void kickoffMeasurement(bool incrementFrequency);
+    void kickoffZMeasurement(bool incrementFrequency);
+
+    void kickoffTemperatureMeasurement();
+
 
     bool getMeasurementResults();
 
     /// Returns true if real/imaginary data is valid in the chip registers (non-blocking).
-    bool isDataReady();
+    bool isZDataReady();
+
+    bool isTemperatureDataReady();
 
     /// Reads real/imaginary registers into `real` and `imaginary`. Call only after isDataReady() returns true.
-    bool readData();
+    void readZData();
+
     /**
      * @brief Reset the device, clearing sweep state while preserving register contents.
      *
@@ -96,6 +102,10 @@ public:
      */
     bool reset();
 
+    // reads temperatue registers into `temperature`. Call only after getStatusBit(TEMPERATURE_VALID_BIT) returns true.
+    void readTemperature();
+
+
     /**
      * @brief Measure and return the internal die temperature.
      *
@@ -104,7 +114,7 @@ public:
      *
      * @return Temperature in degrees Celsius, or -1.0 if the conversion timed out.
      */
-    float getTemperature();
+    float pollForTemperature();
 
     /**
      * @brief Place the device into standby mode.
@@ -152,18 +162,16 @@ public:
     void takeI2CBus();
     #endif
 
-    /// Raw real component of the last impedance measurement (uncalibrated ADC code).
     int real;
-
-    /// Raw imaginary component of the last impedance measurement (uncalibrated ADC code).
     int imaginary;
+    float temperatureC;
 
 private:
     uint8_t PGAandVoltout;  ///< Cached value of control register bits [2:0] for PGA and voltage range.
     TwoWire& _wire;
     #ifdef MUX_ENABLED
-    TCA9548& _mux; // I2C multiplexer instance
-    uint8_t _muxChannel; // Multiplexer channel this device is on
+    TCA9548& _mux;
+    uint8_t _muxChannel;
     #endif
     bool _useExternalClock;
     uint32_t _startFrequency;
@@ -256,7 +264,7 @@ private:
     bool setControlReg(uint8_t command);
 
     /// Poll the status register until ADC data is valid, then read real/imaginary registers.
-    bool getData();
+    bool pollForZData();
 };
 
 #endif

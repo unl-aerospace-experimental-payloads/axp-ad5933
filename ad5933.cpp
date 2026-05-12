@@ -19,6 +19,7 @@ FROM THE AD5933 DATASHEET:
 */
 #define INIT_SETTLING_WAIT_MICROSECONDS         1000        // microseconds to wait after initializing frequency sweep before polling for valid ADC data
 #define ADC_SETTLING_WAIT_MICROSECONDS           1800        // microseconds to wait after issuing a frequency command before polling for valid ADC data
+#define TEMPERATURE_SETTLING_WAIT_MICROSECONDS   800        // microseconds to wait after issuing a measure temperature command before polling for valid temperature data
 #define POLLING_WAIT_MICROSECONDS                1000         // microseconds to wait between polling attempts for valid ADC data or temperature data
 #define POLLING_TIMEOUT_COUNT                    10
 #define STATUS_REGISTER                          0x8F
@@ -233,13 +234,11 @@ bool AD5933::measure(bool increment)
     return ok;
 }
 
-void AD5933::kickoffMeasurement(bool increment)
+void AD5933::kickoffZMeasurement(bool increment)
 {
     if (getStatusBit(FREQUENCY_SWEEP_COMPLETE_BIT)) {
         if (_currentStep != _numberOfSteps) {
             Serial.println("Warning: AD5933 frequency sweep complete bit is set, but currentStep does not equal numberOfSteps. This may indicate that the driver and device are out of sync on the current step count.");
-        } else {
-            // Serial.println("frequency sweep complete bit is set, starting new sweep.");
         }
         // Sweep complete. Reset currentStep back to 0 so that getFrequency() returns to startFrequency until the next sweep starts.
         standby();
@@ -250,12 +249,18 @@ void AD5933::kickoffMeasurement(bool increment)
     } else {
         if (increment) {
             setControlReg(COMMAND_INCREMENT_FREQUENCY);
-            _currentStep++; // THis could potentially before the device actually increments the frequency, but we will assume it works for now. If we wanted to be more robust, we could check the frequency sweep complete bit and reset currentStep back to 0 if we see it set.
+            _currentStep++; // THis could potentially be before the device actually increments the frequency
         } else {
             setControlReg(0x00);
             setControlReg(COMMAND_REPEAT_FREQUENCY);
         }
     }
+}
+
+void AD5933::kickoffTemperatureMeasurement()
+{
+    setControlReg(COMMAND_MEASURE_TEMPERATURE);
+    delayMicroseconds(TEMPERATURE_SETTLING_WAIT_MICROSECONDS);
 }
 
 bool AD5933::getMeasurementResults()
@@ -265,28 +270,41 @@ bool AD5933::getMeasurementResults()
     return ok;
 }
 
-bool AD5933::isDataReady()
+bool AD5933::isZDataReady()
 {
     return getStatusBit(REAL_IMAGINARY_VALID_BIT);
 }
 
-bool AD5933::readData()
+bool AD5933::isTemperatureDataReady()
+{
+    return getStatusBit(TEMPERATURE_VALID_BIT);
+}
+
+void AD5933::readZData()
 {
     uint8_t r_hi = getRegister(0x94);
     uint8_t r_lo = getRegister(0x95);
     uint8_t i_hi = getRegister(0x96);
     uint8_t i_lo = getRegister(0x97);
 
-    real      = (int16_t)((uint16_t)r_hi << 8 | r_lo);
+    real = (int16_t)((uint16_t)r_hi << 8 | r_lo);
     imaginary = (int16_t)((uint16_t)i_hi << 8 | i_lo);
-
-    return true;
 }
 
-bool AD5933::getData()
+void AD5933::readTemperature()
+{
+    uint8_t t_hi = getRegister(0x92);
+    uint8_t t_lo = getRegister(0x93);
+
+    int16_t raw = (int16_t)((uint16_t)t_hi << 8 | t_lo);
+    raw = (raw << 2) >> 2; // fills upper 2 bits with the sign bit to make automatic conversion to negative numbers work correctly. Temperature data is 14 bits.
+    temperatureC = raw / 32.0f;
+}
+
+bool AD5933::pollForZData()
 {
     int i = 0;
-    while (!isDataReady() && i < POLLING_TIMEOUT_COUNT) {
+    while (!isZDataReady() && i < POLLING_TIMEOUT_COUNT) {
         delayMicroseconds(POLLING_WAIT_MICROSECONDS);
         i++;
     }
@@ -296,10 +314,11 @@ bool AD5933::getData()
         return false;
     }
 
-    return readData();
+    readZData();
+    return true;
 }
 
-float AD5933::getTemperature()
+float AD5933::pollForTemperature() 
 {
     setControlReg(COMMAND_MEASURE_TEMPERATURE);
     delayMicroseconds(ADC_SETTLING_WAIT_MICROSECONDS);
@@ -311,14 +330,6 @@ float AD5933::getTemperature()
     }
     if (i == POLLING_TIMEOUT_COUNT) return -1.0f;
 
-    uint8_t data[2];
-    gotoAddressPointer(0x92);
-    readBlock(data, 2);
-
-    int16_t raw = (data[0] << 8) | data[1];
-    if (raw & 0x2000) {
-        // negative: 14-bit two's complement
-        raw |= 0xC000;
-    }
-    return raw / 32.0f;
+    readTemperatureData();
+    return temperature
 }
